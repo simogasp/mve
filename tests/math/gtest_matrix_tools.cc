@@ -40,6 +40,23 @@ TEST(MatrixToolsTest, DiagonalMatrix)
     EXPECT_EQ(diag_test, diag_vector2);
 }
 
+TEST(MatrixToolsTest, MatrixIsDiagonalTest)
+{
+    float mat[3 * 10];
+    std::fill(mat, mat + 3 * 10, 0.0f);
+    EXPECT_TRUE(math::matrix_is_diagonal(mat, 3, 10, 0.0f));
+    EXPECT_TRUE(math::matrix_is_diagonal(mat, 10, 3, 0.0f));
+
+    // Interpret as 3x10 matrix (3 rows, 10 columns).
+    mat[0 * 10 + 0] = 10.0f;
+    mat[1 * 10 + 1] = 20.0f;
+    mat[2 * 10 + 2] = 30.0f;
+    EXPECT_TRUE(math::matrix_is_diagonal(mat, 3, 10, 0.0f));
+
+    mat[2 * 10 + 3] = 40.0f;
+    EXPECT_FALSE(math::matrix_is_diagonal(mat, 3, 10, 0.0f));
+}
+
 TEST(MatrixToolsTest, MatrixIsIdentity)
 {
     math::Matrix3f mat, mat2;

@@ -135,102 +135,68 @@ matrix_2x2_eigenvalues (T const* mat, T* smaller_ev, T* larger_ev)
 }
 
 /**
- * Creates a householder transformation vector and the coefficient for
- * householder matrix creation. As input, the function uses a column-frame
- * in a given matrix, i.e.  mat(subset_row_start:subset_row_end,
- * subset_col).
+ * Calculates the Givens rotation coefficients c and s by solving
+ * [alpha beta] [c s; -c s] = [sqrt(alpha^2 + beta^2) 0].
  */
 template <typename T>
 void
-matrix_householder_vector (T const* input, int length,
-    T* vector, T* beta, T const& epsilon, T const& norm_factor)
+matrix_givens_rotation (T const& alpha, T const& beta,
+    T* givens_c, T* givens_s, T const& epsilon)
 {
-    T sigma(0);
-    for (int i = 1; i < length; ++i)
-        sigma += MATH_POW2(input[i] / norm_factor);
-
-    vector[0] = T(1);
-    for (int i = 1; i < length; ++i)
-        vector[i] = input[i] / norm_factor;
-
-    if (MATH_EPSILON_EQ(sigma, T(0), epsilon))
+    if (MATH_EPSILON_EQ(beta, T(0), epsilon))
     {
-        *beta = T(0);
+        *givens_c = T(1);
+        *givens_s = T(0);
         return;
     }
 
-    T first = input[0] / norm_factor;
-    T mu = std::sqrt(MATH_POW2(first) + sigma);
-    if (first < epsilon)
-        vector[0] = first - mu;
+    if (std::abs(beta) > std::abs(alpha))
+    {
+        T tao = -alpha / beta;
+        *givens_s = T(1) / std::sqrt(T(1) + tao * tao);
+        *givens_c = *givens_s * tao;
+    }
     else
-        vector[0] = -sigma / (first + mu);
-
-    first = vector[0];
-    *beta = T(2) * MATH_POW2(first) / (sigma + MATH_POW2(first));
-    for (int i = 0; i < length; ++i)
-        vector[i] /= first;
-}
-
-/**
- * Given a Householder vector and beta coefficient, this function creates
- * a transformation matrix to apply the Householder Transformation by simple
- * matrix multiplication.
- */
-template <typename T>
-void
-matrix_householder_matrix (T const* vector, int length, T const beta,
-    T* matrix)
-{
-    std::fill(matrix, matrix + length * length, T(0));
-    for (int i = 0; i < length; ++i)
     {
-        matrix[i * length + i] = T(1);
-    }
-
-    for (int i = 0; i < length; ++i)
-    {
-        for (int j = 0; j < length; ++j)
-        {
-            matrix[i * length + j] -= beta * vector[i] * vector[j];
-        }
+        T tao = -beta / alpha;
+        *givens_c = T(1) / std::sqrt(T(1) + tao * tao);
+        *givens_s = *givens_c * tao;
     }
 }
 
 /**
- * Applies a given householder matrix to a frame in a given matrix with
- * offset (offset_rows, offset_cols).
+ * Applies a Givens rotation for columns (givens_i, givens_k)
+ * by only rotating the required set of columns in-place.
  */
 template <typename T>
 void
-matrix_apply_householder_matrix (T* mat_a, int rows, int cols,
-    T const* house_mat, int house_length, int offset_rows, int offset_cols)
+matrix_apply_givens_column (T* mat, int rows, int cols, int givens_i,
+    int givens_k, T const& givens_c, T const& givens_s)
 {
-    /* Save block from old matrix that will be modified. */
-    int house_length_n = house_length - (rows - cols);
-    std::vector<T> rhs(house_length * house_length_n);
-    for (int i = 0; i < house_length; ++i)
+    for (int j = 0; j < rows; ++j)
     {
-        for (int j = 0; j < house_length_n; ++j)
-        {
-            rhs[i * house_length_n + j] = mat_a[(offset_rows + i) *
-                cols + (offset_cols + j)];
-        }
+        T const tao1 = mat[j * cols + givens_i];
+        T const tao2 = mat[j * cols + givens_k];
+        mat[j * cols + givens_i] = givens_c * tao1 - givens_s * tao2;
+        mat[j * cols + givens_k] = givens_s * tao1 + givens_c * tao2;
     }
+}
 
-    /* Multiply block matrices. */
-    for (int i = 0; i < (rows - offset_rows); ++i)
+/**
+ * Applies a transposed Givens rotation for rows (givens_i, givens_k)
+ * by only rotating the required set of rows in-place.
+ */
+template <typename T>
+void
+matrix_apply_givens_row (T* mat, int /*rows*/, int cols, int givens_i,
+    int givens_k, T const& givens_c, T const& givens_s)
+{
+    for (int j = 0; j < cols; ++j)
     {
-        for (int j = 0; j < (cols - offset_cols); ++j)
-        {
-            T current(0);
-            for (int k = 0; k < house_length; ++k)
-            {
-                current += (house_mat[i * house_length + k] *
-                    rhs[k * house_length_n + j]);
-            }
-            mat_a[(offset_rows + i) * cols + (offset_cols + j)] = current;
-        }
+        T const tao1 = mat[givens_i * cols + j];
+        T const tao2 = mat[givens_k * cols + j];
+        mat[givens_i * cols + j] = givens_c * tao1 - givens_s * tao2;
+        mat[givens_k * cols + j] = givens_s * tao1 + givens_c * tao2;
     }
 }
 
@@ -253,53 +219,27 @@ matrix_bidiagonalize (T const* mat_a, int rows, int cols, T* mat_u,
     /* Copy mat_a into mat_b. */
     std::copy(mat_a, mat_a + rows * cols, mat_b);
 
+    std::vector<T> buffer(4 * std::max(rows, cols));
+    T* input_vec = &buffer[0];
+    T* house_vec = input_vec + std::max(rows, cols);
+
     int const steps = (rows == cols) ? (cols - 1) : cols;
     for (int k = 0; k < steps; ++k)
     {
         int const sub_length = rows - k;
-        std::vector<T> buffer(sub_length // input_vec
-            + sub_length // house_vec
-            + sub_length * sub_length // house_mat
-            + rows * rows // update_u
-            + rows * rows); // mat_u_tmp
-        T* input_vec = &buffer[0];
-        T* house_vec = input_vec + sub_length;
-        T* house_mat = house_vec + sub_length;
         T house_beta;
-        T* update_u = house_mat + sub_length * sub_length;
-        T* mat_u_tmp = update_u + rows * rows;
 
         for (int i = 0; i < sub_length; ++i)
             input_vec[i] = mat_b[(k + i) * cols + k];
 
         matrix_householder_vector(input_vec, sub_length, house_vec,
             &house_beta, epsilon, T(1));
-        matrix_householder_matrix(house_vec, sub_length,
-            house_beta, house_mat);
-        matrix_apply_householder_matrix(mat_b, rows, cols,
-            house_mat, sub_length, k, k);
+        matrix_apply_householder_vector_left(mat_b, rows, cols,
+            house_vec, house_beta, k);
+        matrix_apply_householder_vector_right(mat_u, rows, rows,
+            house_vec, house_beta, k);
 
-        for (int i = k + 1; i < rows; ++i)
-            mat_b[i * cols + k] = T(0);
-
-        /* Construct U update matrix and update U. */
-        std::fill(update_u, update_u + rows * rows, T(0));
-        for (int i = 0; i < k; ++i)
-            update_u[i * rows + i] = T(1);
-        for (int i = 0; i < sub_length; ++i)
-        {
-            for (int j = 0; j < sub_length; ++j)
-            {
-                update_u[(k + i) * rows + (k + j)] =
-                    house_mat[i * sub_length + j];
-            }
-        }
-
-        /* Copy matrix U for multiplication. */
-        std::copy(mat_u, mat_u + rows * rows, mat_u_tmp);
-        matrix_multiply(mat_u_tmp, rows, rows, update_u, rows, mat_u);
-
-        if (k <= cols - 3)
+        if (k < cols - 2)
         {
             /* Normalization constant for numerical stability. */
             T norm(0);
@@ -309,73 +249,19 @@ matrix_bidiagonalize (T const* mat_a, int rows, int cols, T* mat_u,
                 norm = T(1);
 
             int const inner_sub_length = cols - (k + 1);
-            int const slice_rows = rows - k;
-            int const slice_cols = cols - k - 1;
-            std::vector<T> buffer2(inner_sub_length // inner_input_vec
-                + inner_sub_length // inner_house_vec
-                + inner_sub_length * inner_sub_length // inner_house_mat
-                + slice_rows * slice_cols // mat_b_res
-                + slice_rows * slice_cols // mat_b_tmp
-                + cols * cols // update_v
-                + cols * cols); // mat_v_tmp
+            T* inner_input_vec = house_vec + std::max(rows, cols);
+            T* inner_house_vec = inner_input_vec + std::max(rows, cols);
 
-            T* inner_input_vec = &buffer2[0];
-            T* inner_house_vec = inner_input_vec + inner_sub_length;
-            T* inner_house_mat = inner_house_vec + inner_sub_length;
-            T inner_house_beta;
-            T* mat_b_res = inner_house_mat  + inner_sub_length * inner_sub_length;
-            T* mat_b_tmp = mat_b_res + slice_rows * slice_cols;
-            T* update_v = mat_b_tmp + slice_rows * slice_cols;
-            T* mat_v_tmp = update_v + cols * cols;
-
-            for (int i = 0; i < cols - k - 1; ++i)
+            for (int i = 0; i < inner_sub_length; ++i)
                 inner_input_vec[i] = mat_b[k * cols + (k + 1 + i)];
 
+            T inner_house_beta;
             matrix_householder_vector(inner_input_vec, inner_sub_length,
                 inner_house_vec, &inner_house_beta, epsilon, norm);
-            matrix_householder_matrix(inner_house_vec, inner_sub_length,
-                inner_house_beta, inner_house_mat);
-
-            /* Cut out mat_b(k:m, (k+1):n). */
-            for (int i = 0; i < slice_rows; ++i)
-            {
-                for (int j = 0; j < slice_cols; ++j)
-                {
-                    mat_b_tmp[i * slice_cols + j] =
-                        mat_b[(k + i) * cols + (k + 1 + j)];
-                }
-            }
-            matrix_multiply(mat_b_tmp, slice_rows, slice_cols,
-                inner_house_mat, inner_sub_length, mat_b_res);
-
-            /* Write frame back into mat_b. */
-            for (int i = 0; i < slice_rows; ++i)
-            {
-                for (int j = 0; j < slice_cols; ++j)
-                {
-                    mat_b[(k + i) * cols + (k + 1 + j)] =
-                        mat_b_res[i * slice_cols + j];
-                }
-            }
-
-            for (int i = k + 2; i < cols; ++i)
-                mat_b[k * cols + i] = T(0);
-
-            std::fill(update_v, update_v + cols * cols, T(0));
-            for (int i = 0; i < k + 1; ++i)
-                update_v[i * cols + i] = T(1);
-            for (int i = 0; i < inner_sub_length; ++i)
-            {
-                for (int j = 0; j < inner_sub_length; ++j)
-                {
-                    update_v[(k + i + 1) * cols + (k + j + 1)] =
-                        inner_house_mat[i * inner_sub_length + j];
-                }
-            }
-
-            /* Copy matrix v for multiplication. */
-            std::copy(mat_v, mat_v + cols * cols, mat_v_tmp);
-            matrix_multiply(mat_v_tmp, cols, cols, update_v, cols, mat_v);
+            matrix_apply_householder_vector_right(mat_b, rows, cols,
+                inner_house_vec, inner_house_beta, k + 1);
+            matrix_apply_householder_vector_right(mat_v, cols, cols,
+                inner_house_vec, inner_house_beta, k + 1);
         }
     }
 }
@@ -420,7 +306,7 @@ matrix_gk_svd_step (int rows, int cols, T* mat_b, T* mat_q, T* mat_p,
     T diff2 = std::abs(mat_c[3] - eig_2);
     T mu = (diff1 < diff2) ? eig_1 : eig_2;
 
-    /* Zero another entry bz applyting givens rotations. */
+    /* Zero another entry by applying givens rotations. */
     int k = p;
     T alpha = mat_b[k * cols + k] * mat_b[k * cols + k] - mu;
     T beta = mat_b[k * cols + k] * mat_b[k * cols + (k + 1)];
@@ -513,19 +399,17 @@ matrix_gk_svd (T const* mat_a, int rows, int cols,
     std::copy(mat_b_full, mat_b_full + cols * cols, mat_b);
 
     /* Avoid infinite loops and exit after maximum number of iterations. */
-    int const max_iterations = rows * cols;
+    int const max_iterations = rows * rows;
     int iteration = 0;
+
     while (iteration < max_iterations)
     {
         iteration += 1;
 
         /* Enforce exact zeros for numerical stability. */
-        for (int i = 0; i < cols * cols; ++i)
-        {
-            T const& entry = mat_b[i];
-            if (MATH_EPSILON_EQ(entry, T(0), epsilon))
-                mat_b[i] = T(0);
-        }
+        for (int i = 0; i < (cols - 1); ++i)
+            if (MATH_EPSILON_EQ(mat_b[i * cols + i + 1], T(0), epsilon))
+                mat_b[i * cols + i + 1] = T(0);
 
         /* GK 2a. */
         for (int i = 0; i < (cols - 1); ++i)
@@ -572,7 +456,7 @@ matrix_gk_svd (T const* mat_a, int rows, int cols,
 
         /* Select z := n-p-q such that B22 has no zero superdiagonal entry. */
         int z = 0;
-        T* mat_b22_tmp = new T[(cols - q) * (cols - q)];
+        std::vector<T> mat_b22_tmp((cols - q) * (cols - q));
         for (int k = 0; k < (cols - q); ++k)
         {
             int const slice_len = k + 1;
@@ -586,12 +470,11 @@ matrix_gk_svd (T const* mat_a, int rows, int cols,
                 }
             }
             if (matrix_is_superdiagonal_nonzero(
-                mat_b22_tmp, slice_len, slice_len, epsilon))
+                &mat_b22_tmp[0], slice_len, slice_len, epsilon))
             {
                 z = k + 1;
             }
         }
-        delete[] mat_b22_tmp;
 
         int const p = cols - q - z;
 
@@ -648,20 +531,26 @@ matrix_r_svd (T const* mat_a, int rows, int cols,
     T* mat_u, T* vec_s, T* mat_v, T const& epsilon)
 {
     /* Allocate memory for temp matrices. */
-    int const mat_q_size = rows * rows;
+    int const mat_w_size = rows * cols;
+    int const mat_y_size = rows * cols;
     int const mat_r_size = rows * cols;
     int const mat_u_tmp_size = rows * cols;
-    std::vector<T> buffer(mat_q_size + mat_r_size + mat_u_tmp_size);
-    T* mat_q = &buffer[0];
-    T* mat_r = mat_q + mat_q_size;
+    int const buf_size = mat_w_size + mat_y_size + mat_r_size + mat_u_tmp_size;
+    std::vector<T> buffer(buf_size);
+    T* mat_w = &buffer[0];
+    T* mat_y = mat_w + mat_w_size;
+    T* mat_r = mat_y + mat_y_size;
     T* mat_u_tmp = mat_r + mat_r_size;
 
-    matrix_qr(mat_a, rows, cols, mat_q, mat_r, epsilon);
+    /* Use a QR-variant that represents Q as 3 matrices W, Y. */
+    matrix_blocked_qr(mat_a, rows, cols, mat_w, mat_y, mat_r, epsilon);
+
+    /* Apply SVD on R. */
     matrix_gk_svd(mat_r, cols, cols, mat_u_tmp, vec_s, mat_v, epsilon);
     std::fill(mat_u_tmp + cols * cols, mat_u_tmp + rows * cols, T(0));
 
     /* Adapt U for big matrices. */
-    matrix_multiply(mat_q, rows, rows, mat_u_tmp, cols, mat_u);
+    matrix_apply_blocked_qr(mat_u_tmp, rows, cols, mat_w, mat_y, mat_u);
 }
 
 /**
@@ -715,6 +604,7 @@ matrix_svd (T const* mat_a, int rows, int cols,
      * the irregular case, where M < N (rows < cols). In the latter one,
      * zero rows are appended to A until A is a square matrix.
      */
+
     if (rows >= cols)
     {
         /* Allow for null result U matrix. */
@@ -725,7 +615,7 @@ matrix_svd (T const* mat_a, int rows, int cols,
         }
 
         /* Perform economy SVD if rows > 5/3 cols to save some operations. */
-        if (rows >= 5 * cols / 3)
+        if (rows > 5 * cols / 3)
         {
             internal::matrix_r_svd(mat_a, rows, cols,
                 mat_u, vec_s, mat_v, epsilon);
@@ -767,110 +657,6 @@ matrix_svd (T const* mat_a, int rows, int cols,
         matrix_swap_columns(mat_v, cols, cols, i, i + pos);
     }
 }
-
-#if 0
-template <typename T>
-void
-matrix_svd (T const* mat_a, int rows, int cols,
-    T* mat_u, T* vec_s, T* mat_v, T const& epsilon)
-{
-    /* Allow for null result matrices. */
-    std::vector<T> mat_u_tmp;
-    std::vector<T> vec_s_tmp;
-    std::vector<T> mat_v_tmp;
-    if (mat_u == nullptr)
-    {
-        mat_u_tmp.resize(rows * cols);
-        mat_u = &mat_u_tmp[0];
-    }
-    if (vec_s == nullptr)
-    {
-        vec_s_tmp.resize(cols);
-        vec_s = &vec_s_tmp[0];
-    }
-    if (mat_v == nullptr)
-    {
-        mat_v_tmp.resize(cols * cols);
-        mat_v = &mat_v_tmp[0];
-    }
-
-    /*
-     * The SVD can only handle systems where rows > cols. Thus, in case
-     * of cols > rows, the input matrix is transposed and the resulting
-     * solution converted to the desired solution:
-     *
-     *   A* = (U S V*)* = V S* U* = V S U*
-     *
-     * In order to output same-sized matrices for every problem, many zero
-     * rows and columns can appear in systems with cols > rows.
-     */
-    std::vector<T> mat_a_tmp;
-    bool was_transposed = false;
-    if (cols > rows)
-    {
-        mat_a_tmp.resize(rows * cols);
-        std::copy(mat_a, mat_a + rows * cols, mat_a_tmp.begin());
-        matrix_transpose(&mat_a_tmp[0], rows, cols);
-        std::swap(rows, cols);
-        std::swap(mat_u, mat_v);
-        mat_a = &mat_a_tmp[0];
-        was_transposed = true;
-    }
-
-    /* Perform economy SVD if rows > 5/3 cols to save some operations. */
-    if (rows >= 5 * cols / 3)
-    {
-        internal::matrix_r_svd(mat_a, rows, cols,
-            mat_u, vec_s, mat_v, epsilon);
-    }
-    else
-    {
-        internal::matrix_gk_svd(mat_a, rows, cols,
-            mat_u, vec_s, mat_v, epsilon);
-    }
-
-    if (was_transposed)
-    {
-        std::swap(rows, cols);
-        std::swap(mat_u, mat_v);
-
-        /* Fix S by appending zeros. */
-        for (int i = rows; i < cols; ++i)
-            vec_s[i] = T(0);
-
-        /* Fix U by reshaping the matrix. */
-        for (int i = rows * rows - 1, y = rows - 1; y >= 0; --y)
-        {
-            for (int x = rows - 1; x >= 0; --x, --i)
-                mat_u[y * cols + x] = mat_u[i];
-            for (int x = rows; x < cols; ++x)
-                mat_u[y * cols + x] = T(0);
-        }
-
-        /* Fix V by reshaping the matrix. */
-        for (int i = cols * rows - 1, y = cols - 1; y >= 0; --y)
-        {
-            for (int x = rows - 1; x >= 0; --x, --i)
-                mat_v[y * cols + x] = mat_v[i];
-            for (int x = rows; x < cols; ++x)
-                mat_v[y * cols + x] = T(0);
-        }
-    }
-
-    /* Sort the eigenvalues in S and adapt the columns of U and V. */
-    for (int i = 0; i < cols; ++i)
-    {
-        int pos = internal::find_largest_ev_index(vec_s + i, cols - i);
-        if (pos < 0)
-            break;
-        if (pos == 0)
-            continue;
-        std::swap(vec_s[i], vec_s[i + pos]);
-        matrix_swap_columns(mat_u, rows, cols, i, i + pos);
-        matrix_swap_columns(mat_v, cols, cols, i, i + pos);
-    }
-}
-#endif
 
 template <typename T, int M, int N>
 void
