@@ -117,32 +117,30 @@ TEST(MatrixSVDTest, MatrixBidiagonalizationStandardTest)
 
 TEST(MatrixSVDTest, MatrixBidiagonalizationLargeTest)
 {
-    const int M = 5;
-    const int N = 4;
-    double * test_matrix = new double[M * N];
-    for (int i = 0; i < M*N; ++i)
+    const int M = 50;
+    const int N = 100;
+    double* test_matrix = new double[M * N];
+    for (int i = 0; i < M * N; ++i)
     {
         test_matrix[i] = static_cast<double>(i + 1);
     }
 
-    double * mat_u = new double[M * M];
-    double * mat_b = new double[M * N];
-    double * mat_v = new double[N * N];
+    double* mat_u = new double[M * M];
+    double* mat_b = new double[M * N];
+    double* mat_v = new double[N * N];
 
     math::internal::matrix_bidiagonalize(test_matrix, M, N,
         mat_u, mat_b, mat_v, 1e-13);
-
-    // transpose mat_v
     math::matrix_transpose(mat_v, N, N);
 
-    double * res_1 = new double[M * N];
-    double * res_2 = new double[M * N];
+    double* res_1 = new double[M * N];
+    double* res_2 = new double[M * N];
 
     math::matrix_multiply(mat_u, M, M, mat_b, N, res_1);
     math::matrix_multiply(res_1, M, N, mat_v, N, res_2);
 
     for (int i = 0; i < M * N; ++i)
-        EXPECT_NEAR(test_matrix[i], res_2[i], 1e-13);
+        EXPECT_NEAR(test_matrix[i], res_2[i], 1e-10);
 
     delete[] test_matrix;
     delete[] mat_u;
