@@ -31,7 +31,7 @@ before_build:
     - ls -l
 
 build:
-  verbosity: detailed
+  verbosity: minimal
   project: $(APPVEYOR_BUILD_FOLDER)\build\mve.sln
   parallel: true
 
