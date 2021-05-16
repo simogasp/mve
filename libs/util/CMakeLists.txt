@@ -8,7 +8,8 @@ set(UTIL_HEADERS
 	file_system.h
 	frame_timer.h
 	ini_parser.h
-	string.h
+	logging.h
+	strings.h
 	system.h
 	timer.h
 	tokenizer.h)

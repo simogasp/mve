@@ -45,6 +45,9 @@ public:
     /** Sets the quaternion from axis and angle. */
     void set (Vector<T,3> const& axis, T const& angle);
 
+    /** Sets the quaternion from an orthonormal rotation matrix. */
+    void set_from_rotation_matrix (T const* matrix);
+
     /** Provides the axis and angle of the quaternion. */
     void get_axis_angle (T* axis, T& angle);
 
@@ -132,24 +135,67 @@ Quaternion<T>::set (Vector<T,3> const& axis, T const& angle)
 }
 
 template <typename T>
+inline void
+Quaternion<T>::set_from_rotation_matrix (T const* rot)
+{
+    float trace = rot[0] + rot[4] + rot[8];
+    if (trace > 0)
+    {
+        float s = T(0.5) / std::sqrt(trace + T(1.0));
+        // w x y z
+        this->v[0] = T(0.25) / s;
+        this->v[1] = (rot[7] - rot[5]) * s;
+        this->v[2] = (rot[2] - rot[6]) * s;
+        this->v[3] = (rot[3] - rot[1]) * s;
+    }
+    else
+    {
+        if (rot[0] > rot[4] && rot[0] > rot[8])
+        {
+            float s = T(2.0) * std::sqrt(T(1.0) + rot[0] - rot[4] - rot[8]);
+            this->v[0] = (rot[7] - rot[5]) / s;
+            this->v[1] = T(0.25) * s;
+            this->v[2] = (rot[1] + rot[3]) / s;
+            this->v[3] = (rot[2] + rot[6]) / s;
+        }
+        else if (rot[4] > rot[8])
+        {
+            float s = T(2.0) * std::sqrt(T(1.0) + rot[4] - rot[0] - rot[8]);
+            this->v[0] = (rot[2] - rot[6]) / s;
+            this->v[1] = (rot[1] + rot[3]) / s;
+            this->v[2] = T(0.25) * s;
+            this->v[3] = (rot[5] + rot[7]) / s;
+        }
+        else
+        {
+            float s = T(2.0) * std::sqrt(T(1.0) + rot[8] - rot[0] - rot[4]);
+            this->v[0] = (rot[3] - rot[1]) / s;
+            this->v[1] = (rot[2] + rot[6]) / s;
+            this->v[2] = (rot[5] + rot[7]) / s;
+            this->v[3] = T(0.25) * s;
+        }
+  }
+}
+
+template <typename T>
 void
 Quaternion<T>::get_axis_angle (T* axis, T& angle)
 {
-    T len = this->norm();
+    const T len = std::sqrt(MATH_POW2(this->v[1])
+        + MATH_POW2(this->v[2]) + MATH_POW2(this->v[3]));
     if (len == T(0))
     {
         axis[0] = T(1);
         axis[1] = T(0);
         axis[2] = T(0);
         angle = T(0);
+        return;
     }
-    else
-    {
-        axis[0] = this->v[1] / len;
-        axis[1] = this->v[2] / len;
-        axis[2] = this->v[3] / len;
-        angle = T(2) * std::acos(this->v[0]);
-    }
+
+    axis[0] = this->v[1] / len;
+    axis[1] = this->v[2] / len;
+    axis[2] = this->v[3] / len;
+    angle = T(2) * std::acos(this->v[0]);
 }
 
 template <typename T>
@@ -169,13 +215,13 @@ Quaternion<T>::to_rotation_matrix (T* matrix) const
     T const zr2 = this->v[3] * this->v[0] * T(2);
 
     matrix[0] = xxzz + rryy;
-    matrix[1] = xy2 + zr2;
-    matrix[2] = xz2 - yr2;
-    matrix[3] = xy2 - zr2;
+    matrix[1] = xy2 - zr2;
+    matrix[2] = xz2 + yr2;
+    matrix[3] = xy2 + zr2;
     matrix[4] = yyrrxxzz;
-    matrix[5] = yz2 + xr2;
-    matrix[6] = xz2 + yr2;
-    matrix[7] = yz2 - xr2;
+    matrix[5] = yz2 - xr2;
+    matrix[6] = xz2 - yr2;
+    matrix[7] = yz2 + xr2;
     matrix[8] = rryy - xxzz;
 }
 

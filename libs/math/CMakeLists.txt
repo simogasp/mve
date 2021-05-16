@@ -15,6 +15,7 @@ set(MATH_HEADERS
 	permute.h
 	plane.h
 	quaternion.h
+	transform.h
 	vector.h)
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015, Simon Fuhrmann
+ * Copyright (C) 2015, Simon Fuhrmann, Fabian Langguth
  * TU Darmstadt - Graphics, Capture and Massively Parallel Computing
  * All rights reserved.
  *
@@ -45,6 +45,8 @@ public:
         bool ba_shared_intrinsics;
         /** Produce status messages on the console. */
         bool verbose_output;
+        /** Produce detailed BA messages on the console. */
+        bool verbose_ba;
     };
 
 public:
@@ -58,7 +60,9 @@ public:
      *   the camera pose is regularly updated.
      * - tracks: The tracks are triangulated and regularly updated.
      */
-    void initialize (ViewportList* viewports, TrackList* tracks);
+    void initialize (ViewportList* viewports, TrackList* tracks,
+        SurveyPointList* survey_points = nullptr);
+
     /** Returns whether the incremental SfM has been initialized. */
     bool is_initialized (void) const;
 
@@ -66,6 +70,8 @@ public:
     void find_next_views (std::vector<int>* next_views);
     /** Incrementally adds the given view to the bundle. */
     bool reconstruct_next_view (int view_id);
+    /** Restore tracks for views after intrinsics are optimized. */
+    void try_restore_tracks_for_views (void);
     /** Triangulates tracks without 3D position and at least N views. */
     void triangulate_new_tracks (int min_num_views);
     /** Deletes tracks with a large reprojection error. */
@@ -74,6 +80,13 @@ public:
     void bundle_adjustment_full (void);
     /** Runs bundle adjustment on a single camera without structure. */
     void bundle_adjustment_single_cam (int view_id);
+    /** Runs bundle adjustment on the structure (3D points) only. */
+    void bundle_adjustment_points_only (void);
+
+    /** Tries to register the scene to the survey points. */
+    void try_registration (void);
+    /** Prints MSE of survey points. */
+    void print_registration_error (void) const;
 
     /** Transforms the bundle for numerical stability. */
     void normalize_scene (void);
@@ -87,18 +100,21 @@ private:
     Options opts;
     ViewportList* viewports;
     TrackList* tracks;
+    SurveyPointList* survey_points;
+    bool registered = false;
 };
 
 /* ------------------------ Implementation ------------------------ */
 
 inline
 Incremental::Options::Options (void)
-    : track_error_threshold_factor(25.0)
-    , new_track_error_threshold(10.0)
+    : track_error_threshold_factor(10.0)
+    , new_track_error_threshold(0.01)
     , min_triangulation_angle(MATH_DEG2RAD(1.0))
     , ba_fixed_intrinsics(false)
     , ba_shared_intrinsics(false)
     , verbose_output(false)
+    , verbose_ba(false)
 {
 }
 

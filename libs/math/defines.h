@@ -10,6 +10,8 @@
 #ifndef MATH_DEFINES_HEADER
 #define MATH_DEFINES_HEADER
 
+#include <limits>
+
 #define MATH_NAMESPACE_BEGIN namespace math {
 #define MATH_NAMESPACE_END }
 
@@ -42,6 +44,7 @@ MATH_NAMESPACE_END
 #define MATH_PI_4       0.785398163397448309615660845819875721  // pi/4
 #define MATH_1_PI       0.318309886183790671537767526745028724  // 1/pi
 #define MATH_2_PI       0.636619772367581343075535053490057448  // 2/pi
+#define MATH_TAU        6.283185307179586476925286766559005768  // 2*pi
 
 #define MATH_SQRT2      1.41421356237309504880168872420969808   // sqrt(2)
 #define MATH_SQRT3      1.7320508075688772935274463415058723669 // sqrt(3)
@@ -58,8 +61,8 @@ MATH_NAMESPACE_END
 #define MATH_LN10       2.30258509299404568401799145468436421   // log_e(10)
 
 /* Infinity values. Consider using +/-FLT_MAX, or +/-DBL_MAX. */
-#define MATH_POS_INF (1.0 / 0.0)
-#define MATH_NEG_INF (1.0 / -0.0)
+#define MATH_POS_INF (std::numeric_limits<double>::infinity())
+#define MATH_NEG_INF (-MATH_POS_INF)
 
 /* Fast power macros. */
 #define MATH_POW2(x) ((x) * (x))

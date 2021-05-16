@@ -20,7 +20,7 @@
 #include "mve/image.h"
 #include "mve/image_tools.h"
 #include "util/file_system.h"
-#include "util/string.h"
+#include "util/strings.h"
 #include "dmrecon/settings.h"
 #include "dmrecon/dmrecon.h"
 #include "dmrecon/global_view_selection.h"
@@ -161,7 +161,7 @@ DMRecon::start()
         if (!settings.quiet)
             std::cout << "MVS took " << mvs_time << " seconds." << std::endl;
     }
-    catch (util::Exception e)
+    catch (util::Exception& e)
     {
         if (!settings.quiet)
             std::cout << "Reconstruction failed: " << e << std::endl;

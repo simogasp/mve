@@ -17,7 +17,7 @@
 #include <QRadioButton>
 
 #include "util/timer.h"
-#include "util/string.h"
+#include "util/strings.h"
 #include "mve/image.h"
 #include "mve/image_tools.h"
 
@@ -416,7 +416,7 @@ ToneMapping::setup_histogram (void)
     std::vector<int> bins(num_bins, 0);
     float const image_range = this->image_vmax - this->image_vmin;
     /* Only build a histogram if the image is not constant. */
-    if (this->image_vmax != this->image_vmin)
+    if (this->image_vmax != this->image_vmin && std::isfinite(image_range))
     {
         for (float const* ptr = fimg.begin(); ptr != fimg.end(); ++ptr)
         {

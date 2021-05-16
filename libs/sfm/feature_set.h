@@ -53,6 +53,9 @@ public:
     /** Computes the features specified in the options. */
     void compute_features (mve::ByteImage::Ptr image);
 
+    /** Normalizes the features positions w.r.t. the image dimensions. */
+    void normalize_feature_positions (float px, float py);
+
     /** Clear descriptor data. */
     void clear_descriptors (void);
 

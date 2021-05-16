@@ -8,6 +8,7 @@ set(MVE_MATH_TEST_SOURCES
         matrix_qr
         matrix_svd
         matrix_tools
+        quaternion
         vector
         )
 

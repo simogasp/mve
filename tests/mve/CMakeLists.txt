@@ -9,6 +9,7 @@ set(MVE_MVE_TEST_SOURCES
         mesh_info
         mesh_io
         mesh_tools
+        scene
         triangle_mesh
         view
         )

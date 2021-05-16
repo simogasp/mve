@@ -14,12 +14,7 @@
 #include <iostream>
 #include <random>
 
-#ifdef _MSC_VER
-#   include <nmmintrin.h>
-#else
-#   include <popcntintrin.h>
-#endif
-
+#include "math/functions.h"
 #include "math/vector.h"
 #include "sfm/defines.h"
 #include "sfm/exhaustive_matching.h"
@@ -170,11 +165,6 @@ private:
         std::vector<math::Vec128f> const& sift_zero_mean_descs,
         std::vector<math::Vec64f> const& surf_zero_mean_descs,
         GlobalData const& cashash_global_data, Options const& cashash_opts);
-
-    /** Convert discretized SIFT/SURF descriptors to zero mean. */
-    void preprocess (ProcessedFeatureSets const& pfs,
-        std::vector<math::Vec128f>* sift_zero_mean_descs,
-        std::vector<math::Vec64f>* surf_zero_mean_descs);
 
     /** Compute average descriptors of given feature sets. */
     void compute_avg_descriptors (ProcessedFeatureSets const& pfs,
@@ -449,7 +439,7 @@ CascadeHashing::collect_features_from_buckets (
             uint64_t const *ptr2 = &comp_hash_data2[candidate_id * DIMHASH / 64];
             int hamming_dist = 0;
             for (int k = 0; k < (DIMHASH / 64); k++)
-                hamming_dist += _mm_popcnt_u64(comp_hash_data1[k] ^ ptr2[k]);
+                hamming_dist += math::popcount(comp_hash_data1[k] ^ ptr2[k]);
 
             (*grouped_features)[hamming_dist].emplace_back(candidate_id);
             (*data_index_used)[candidate_id] = true;

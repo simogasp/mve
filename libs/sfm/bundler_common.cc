@@ -22,6 +22,9 @@
 #define PREBUNDLE_SIGNATURE "MVE_PREBUNDLE\n"
 #define PREBUNDLE_SIGNATURE_LEN 14
 
+#define SURVEY_SIGNATURE "MVE_SURVEY\n"
+#define SURVEY_SIGNATURE_LEN 11
+
 SFM_NAMESPACE_BEGIN
 SFM_BUNDLER_NAMESPACE_BEGIN
 
@@ -208,6 +211,117 @@ load_prebundle_from_file (std::string const& filename,
         throw util::Exception("Premature EOF");
     }
     in.close();
+}
+
+void
+load_survey_from_file (std::string const& filename,
+    SurveyPointList* survey_points)
+{
+    std::ifstream in(filename.c_str());
+    if (!in.good())
+        throw util::FileException(filename, std::strerror(errno));
+
+    char signature[SURVEY_SIGNATURE_LEN + 1];
+    in.read(signature, SURVEY_SIGNATURE_LEN);
+    signature[SURVEY_SIGNATURE_LEN] = '\0';
+    if (std::string(SURVEY_SIGNATURE) != signature)
+        throw std::invalid_argument("Invalid survey file signature");
+
+    std::size_t num_points = 0;
+    std::size_t num_observations = 0;
+    in >> num_points >> num_observations;
+    if (in.fail())
+    {
+        in.close();
+        throw util::Exception("Invalid survey file header");
+    }
+
+    survey_points->resize(num_points);
+    for (std::size_t i = 0; i < num_points; ++i)
+    {
+        SurveyPoint& survey_point = survey_points->at(i);
+        for (int j = 0; j < 3; ++j)
+            in >> survey_point.pos[j];
+    }
+
+    for (std::size_t i = 0; i < num_observations; ++i)
+    {
+        int point_id, view_id;
+        float x, y;
+        in >> point_id >> view_id >> x >> y;
+
+        if (static_cast<std::size_t>(point_id) > num_points)
+            throw util::Exception("Invalid survey point id");
+
+        SurveyPoint& survey_point = survey_points->at(point_id);
+        survey_point.observations.emplace_back(view_id, x, y);
+    }
+
+    if (in.fail())
+    {
+        in.close();
+        throw util::Exception("Parsing error");
+    }
+
+    in.close();
+}
+
+/* ---------------------- Feature undistortion -------------------- */
+
+namespace {
+    double distort_squared_radius (double const r2, double const k1,
+        double const k2)
+    {
+        // Compute the distorted squared radius:
+        // (radius * distortion_coeff)^2 = r^2 * coeff^2
+        double coeff = 1.0 + r2 * k1 + r2 * r2 * k2;
+        return r2 * coeff * coeff;
+    }
+
+    double solve_undistorted_squared_radius (double const r2,
+        double const k1, double const k2)
+    {
+        // Guess initial interval upper and lower bound
+        double lbound = r2, ubound = r2;
+        while (distort_squared_radius(lbound, k1, k2) > r2)
+        {
+            ubound = lbound;
+            lbound /= 1.05;
+        }
+        while (distort_squared_radius(ubound, k1, k2) < r2)
+        {
+            lbound = ubound;
+            ubound *= 1.05;
+        }
+
+        // We use bisection as we can easily find a pretty good initial guess,
+        // and we don't want to compute all roots for a 5th degree polynomial.
+
+        // Perform a bisection until epsilon accuracy is reached
+        double mid = 0.5 * (lbound + ubound);
+        while (mid != lbound && mid != ubound)
+        {
+            if (distort_squared_radius(mid, k1, k2) > r2)
+                ubound = mid;
+            else
+                lbound = mid;
+            mid = 0.5 * (lbound + ubound);
+        }
+        // Return center of interval
+        return mid;
+    }
+}
+
+math::Vec2f
+undistort_feature (math::Vec2f const& f, double const k1, double const k2,
+    float const focal_length)
+{
+    // Convert to camera coords
+    double const r2 = f.square_norm() / MATH_POW2(focal_length);
+    double scale = 1.0;
+    if (r2 > 0.0)
+        scale = std::sqrt(solve_undistorted_squared_radius(r2, k1, k2) / r2);
+    return f * scale;
 }
 
 SFM_BUNDLER_NAMESPACE_END

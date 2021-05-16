@@ -1,4 +1,11 @@
 set(SFM_HEADERS
+        ba_cholesky.h
+        ba_conjugate_gradient.h
+        ba_dense_vector.h
+        ba_linear_solver.h
+        ba_sparse_matrix.h
+        ba_types.h
+        bundle_adjustment.h
         bundler_common.h
         bundler_features.h
         bundler_incremental.h
@@ -19,9 +26,6 @@ set(SFM_HEADERS
         matching.h
         matching_base.h
         nearest_neighbor.h
-        pba_config.h
-        pba_cpu.h
-        pba_types.h
         pose_p3p.h
         ransac.h
         ransac_fundamental.h
@@ -33,7 +37,9 @@ set(SFM_HEADERS
         visualizer.h)
 
 set(SFM_SOURCES
-	bundler_common.cc
+        ba_linear_solver.cc
+        bundle_adjustment.cc
+        bundler_common.cc
         bundler_features.cc
         bundler_incremental.cc
         bundler_init_pair.cc
@@ -49,8 +55,6 @@ set(SFM_SOURCES
         homography.cc
         matching.cc
         nearest_neighbor.cc
-        pba_config.cc
-        pba_cpu.cc
         pose_p3p.cc
         ransac.cc
         ransac_fundamental.cc

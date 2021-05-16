@@ -1,4 +1,8 @@
 set(MVE_SFM_TEST_SOURCES
+        ba_cholesky
+        ba_conjugate_gradient
+        ba_dense_vector
+        ba_sparse_matrix
         bundler_tracks
         homography
         matching

@@ -5,11 +5,13 @@ all:
 	$(MAKE) -C meshconvert
 	$(MAKE) -C scene2pset
 	$(MAKE) -C sfmrecon
+	$(MAKE) -C featurerecon
 	$(MAKE) -C fssrecon
 	$(MAKE) -C mesh2pset
 	$(MAKE) -C meshalign
 	$(MAKE) -C meshclean
 	$(MAKE) -C sceneupgrade
+	$(MAKE) -C prebundle
 
 clean:
 	$(MAKE) -C bundle2pset $@
@@ -18,24 +20,31 @@ clean:
 	$(MAKE) -C meshconvert $@
 	$(MAKE) -C scene2pset $@
 	$(MAKE) -C sfmrecon $@
+	$(MAKE) -C featurerecon $@
 	$(MAKE) -C fssrecon $@
 	$(MAKE) -C mesh2pset $@
 	$(MAKE) -C meshalign $@
 	$(MAKE) -C meshclean $@
 	$(MAKE) -C sceneupgrade $@
+	$(MAKE) -C prebundle $@
+
+BINDIR ?= $(HOME)/bin/
+APPDIR := $(shell pwd)
 
 links:
-	ln -sir bundle2pset/bundle2pset $(HOME)/bin/
-	ln -sir dmrecon/dmrecon $(HOME)/bin/
-	ln -sir makescene/makescene $(HOME)/bin/
-	ln -sir meshconvert/meshconvert $(HOME)/bin/
-	ln -sir scene2pset/scene2pset $(HOME)/bin/
-	ln -sir sfmrecon/sfmrecon $(HOME)/bin/
-	ln -sir fssrecon/fssrecon $(HOME)/bin/
-	ln -sir mesh2pset/mesh2pset $(HOME)/bin/
-	ln -sir meshalign/meshalign $(HOME)/bin/
-	ln -sir meshclean/meshclean $(HOME)/bin/
-	ln -sir sceneupgrade/sceneupgrade $(HOME)/bin/
-	ln -sir umve/umve $(HOME)/bin/
+	ln -si $(APPDIR)/bundle2pset/bundle2pset $(BINDIR)
+	ln -si $(APPDIR)/dmrecon/dmrecon $(BINDIR)
+	ln -si $(APPDIR)/makescene/makescene $(BINDIR)
+	ln -si $(APPDIR)/meshconvert/meshconvert $(BINDIR)
+	ln -si $(APPDIR)/scene2pset/scene2pset $(BINDIR)
+	ln -si $(APPDIR)/sfmrecon/sfmrecon $(BINDIR)
+	ln -si $(APPDIR)/featurerecon/featurerecon $(BINDIR)
+	ln -si $(APPDIR)/fssrecon/fssrecon $(BINDIR)
+	ln -si $(APPDIR)/mesh2pset/mesh2pset $(BINDIR)
+	ln -si $(APPDIR)/meshalign/meshalign $(BINDIR)
+	ln -si $(APPDIR)/meshclean/meshclean $(BINDIR)
+	ln -si $(APPDIR)/sceneupgrade/sceneupgrade $(BINDIR)
+	ln -si $(APPDIR)/prebundle/prebundle $(BINDIR)
+	ln -si $(APPDIR)/umve/umve $(BINDIR)
 
 .PHONY: all clean links

@@ -15,7 +15,7 @@
 #include <string>
 #include <stdexcept>
 
-#include "util/string.h"
+#include "util/strings.h"
 #include "util/defines.h"
 #include "util/exception.h"
 
@@ -122,11 +122,9 @@ public:
         bool has_argument, std::string const& description = "");
 
     /** Parses arguments from a vector. */
-    void parse (std::vector<std::string> const& args)
-        throw(util::Exception);
+    void parse (std::vector<std::string> const& args);
     /** Parses command line arguments. */
-    void parse (int argc, char const* const* argv)
-        throw(util::Exception);
+    void parse (int argc, char const* const* argv);
 
     /**
      * Iterator for the results. If opt is null, the argument is a
