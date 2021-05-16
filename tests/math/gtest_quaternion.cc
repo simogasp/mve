@@ -7,6 +7,8 @@
 
 #include "math/quaternion.h"
 
+#include <cmath>
+
 TEST(QuaternionTest, Rotate)
 {
     using namespace math;
