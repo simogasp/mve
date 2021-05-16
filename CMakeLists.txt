@@ -25,6 +25,16 @@ else()
     message(STATUS "Building in ${CMAKE_BUILD_TYPE} configuration")
 endif()
 
+# ensure the proper linker flags when building the static version on MSVC
+if(MSVC AND NOT BUILD_SHARED_LIBS)
+    foreach(config "DEBUG" "RELEASE" "MINSIZEREL" "RELWITHDEBINFO")
+        string(REPLACE /MD /MT CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_${config}}")
+        string(REPLACE /MD /MT CMAKE_CXX_FLAGS_${config} "${CMAKE_CXX_FLAGS_${config}}")
+        message(STATUS "CMAKE_C_FLAGS_${config} ${CMAKE_C_FLAGS_${config}}")
+        message(STATUS "CMAKE_CXX_FLAGS_${config} ${CMAKE_CXX_FLAGS_${config}}")
+    endforeach()
+endif()
+
 include(GNUInstallDirs)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
