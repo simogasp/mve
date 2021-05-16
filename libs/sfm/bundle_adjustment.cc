@@ -208,7 +208,7 @@ BundleAdjustment::compute_reprojection_errors (DenseVectorType* vector_f,
         vector_f->resize(this->observations->size() * 2);
 
 #pragma omp parallel for
-    for (std::size_t i = 0; i < this->observations->size(); ++i)
+    for (int i = 0; i < static_cast<int>(this->observations->size()); ++i)
     {
         Observation const& obs = this->observations->at(i);
         Point3D const& p3d = this->points->at(obs.point_id);
@@ -323,7 +323,7 @@ BundleAdjustment::analytic_jacobian (SparseMatrixType* jac_cam,
     {
         double cam_x_ptr[9], cam_y_ptr[9], point_x_ptr[3], point_y_ptr[3];
 #pragma omp for
-        for (std::size_t i = 0; i < this->observations->size(); ++i)
+        for (int i = 0; i < static_cast<int>(this->observations->size()); ++i)
         {
             Observation const& obs = this->observations->at(i);
             Point3D const& p3d = this->points->at(obs.point_id);

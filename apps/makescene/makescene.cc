@@ -654,7 +654,7 @@ import_bundle_noah_ps (AppSettings const& conf)
     num_valid_cams = 0;
 
     #pragma omp parallel for
-    for (std::size_t i = 0; i < cams.size(); ++i)
+    for (int i = 0; i < static_cast<int>(cams.size()); ++i)
     {
         /*
          * For each camera in the bundle file, a new view is created.
